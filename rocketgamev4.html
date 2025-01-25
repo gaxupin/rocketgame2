@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juego de Cohete Espacial con Imágenes Públicas</title>
+  <style>
+    /* Estilos generales */
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #000000, #0f2a52);
+      font-family: Arial, sans-serif;
+    }
+
+    /* Menú y pantalla de Game Over con animaciones suaves */
+    #menu,
+    #gameOver {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: white;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, visibility 0.5s;
+    }
+    #menu.show,
+    #gameOver.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #menu button,
+    #gameOver button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 10px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.3s ease;
+    }
+    #menu button:hover,
+    #gameOver button:hover {
+      background: #1976d2;
+    }
+
+    /* Panel de instrucciones */
+    #instructions {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #f1f1f1;
+    }
+
+    /* El canvas central donde se dibuja el juego */
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background-color: rgba(0, 0, 0, 0.5);
+      border: 2px solid #ffffff33;
+    }
+
+    /* Información en pantalla (score, nivel, vidas) */
+    #gameInfo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 18px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Menú inicial -->
+  <div id="menu">
+    <h1>Juego de Cohete Espacial</h1>
+    <button onclick="startGame()">Iniciar Juego</button>
+    <div id="instructions">
+      <p>Usa las flechas del teclado para mover tu cohete y esquivar los planetas.</p>
+      <p>Recoge power-ups para obtener invencibilidad temporal.</p>
+    </div>
+  </div>
+
+  <!-- Pantalla de Game Over -->
+  <div id="gameOver">
+    <h1>¡Juego Terminado!</h1>
+    <p id="finalScore"></p>
+    <button onclick="resetGame()">Reiniciar Juego</button>
+  </div>
+
+  <!-- Info en pantalla mientras jugamos -->
+  <div id="gameInfo">
+    <span id="scoreDisplay">Puntuación: 0</span><br />
+    <span id="levelDisplay">Nivel: 1</span><br />
+    <span id="livesDisplay">Vidas: 3</span>
+  </div>
+
+  <!-- Lienzo principal -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    // Referencia al canvas y su contexto
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Usaremos imágenes públicas de un repositorio de GitHub, con crossOrigin = "anonymous"
+    // para evitar errores de CORS.
+
+    // Cohete
+    const rocketImg = new Image();
+    rocketImg.crossOrigin = "anonymous";
+    rocketImg.src =
+      "spaceship.png";
+
+    // Planetas (usaremos una lista para un poco de variedad)
+    const planetSources = [
+      "tierra.png",
+      "jupiter.png"
+    ];
+
+    // Creamos array de imágenes
+    const planetImages = planetSources.map((url) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = url;
+      return img;
+    });
+
+    // PowerUp (estrella)
+    const powerUpImg = new Image();
+    powerUpImg.crossOrigin = "anonymous";
+    powerUpImg.src =
+      "rocketicon.png";
+
+    // Referencias a elementos HTML
+    const menu = document.getElementById("menu");
+    const gameOverDiv = document.getElementById("gameOver");
+    const finalScore = document.getElementById("finalScore");
+    const gameInfo = document.getElementById("gameInfo");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const levelDisplay = document.getElementById("levelDisplay");
+    const livesDisplay = document.getElementById("livesDisplay");
+
+    let planets = [];
+    let powerUps = [];
+
+    const planetCount = 5; // Cantidad base de planetas
+    let score = 0;
+    let level = 1;
+    let gameRunning = false;
+
+    // Objeto cohete
+    const rocket = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      size: 80, // más grande para visibilidad
+      dx: 0,
+      dy: 0,
+      speed: 4,
+      lives: 3,
+      invulnerable: false,
+    };
+
+    // Genera planetas al azar con imágenes aleatorias
+    function createPlanets() {
+      planets = [];
+      for (let i = 0; i < planetCount + level; i++) {
+        // Elige una imagen de forma aleatoria
+        const randomImg = planetImages[
+          Math.floor(Math.random() * planetImages.length)
+        ];
+        planets.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 60 + Math.random() * 30,
+          dx: (Math.random() - 0.5) * 2,
+          dy: (Math.random() - 0.5) * 2,
+          img: randomImg,
+        });
+      }
+    }
+
+    // Genera los powerUps (estrellas) al azar
+    function createPowerUps() {
+      powerUps = [];
+      for (let i = 0; i < 3; i++) {
+        powerUps.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 40,
+          collected: false,
+        });
+      }
+    }
+
+    function drawRocket() {
+      ctx.drawImage(rocketImg, rocket.x, rocket.y, rocket.size, rocket.size);
+    }
+
+    function drawPlanets() {
+      planets.forEach((planet) => {
+        ctx.drawImage(planet.img, planet.x, planet.y, planet.size, planet.size);
+      });
+    }
+
+    function drawPowerUps() {
+      powerUps.forEach((powerUp) => {
+        if (!powerUp.collected) {
+          ctx.drawImage(powerUpImg, powerUp.x, powerUp.y, powerUp.size, powerUp.size);
+        }
+      });
+    }
+
+    function updateRocket() {
+      rocket.x += rocket.dx;
+      rocket.y += rocket.dy;
+
+      // Mantener el cohete dentro de la pantalla
+      if (rocket.x < 0) rocket.x = 0;
+      if (rocket.x + rocket.size > canvas.width)
+        rocket.x = canvas.width - rocket.size;
+      if (rocket.y < 0) rocket.y = 0;
+      if (rocket.y + rocket.size > canvas.height)
+        rocket.y = canvas.height - rocket.size;
+    }
+
+    function updatePlanets() {
+      planets.forEach((planet) => {
+        planet.x += planet.dx;
+        planet.y += planet.dy;
+
+        // Rebote en los bordes
+        if (planet.x < 0 || planet.x > canvas.width) {
+          planet.dx *= -1;
+        }
+        if (planet.y < 0 || planet.y > canvas.height) {
+          planet.dy *= -1;
+        }
+      });
+    }
+
+    function checkCollision() {
+      // Colisión con planetas
+      planets.forEach((planet) => {
+        const distX = rocket.x - planet.x;
+        const distY = rocket.y - planet.y;
+        const distance = Math.sqrt(distX * distX + distY * distY);
+
+        if (distance < rocket.size + planet.size && !rocket.invulnerable) {
+          rocket.lives--;
+          livesDisplay.textContent = "Vidas: " + rocket.lives;
+
+          if (rocket.lives <= 0) {
+            endGame();
+          } else {
+            // Reiniciamos la posición del cohete
+            rocket.x = canvas.width / 2;
+            rocket.y = canvas.height / 2;
+            createPlanets();
+          }
+        }
+      });
+
+      // Recolección de powerUps
+      powerUps.forEach((powerUp) => {
+        const distX = rocket.x - powerUp.x;
+        const distY = rocket.y - powerUp.y;
+        const distance = Math.sqrt(distX * distX + distY * distY);
+
+        if (distance < rocket.size + powerUp.size && !powerUp.collected) {
+          powerUp.collected = true;
+          rocket.invulnerable = true;
+          setTimeout(() => (rocket.invulnerable = false), 5000);
+        }
+      });
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function gameLoop() {
+      if (gameRunning) {
+        clearCanvas();
+        drawRocket();
+        drawPlanets();
+        drawPowerUps();
+        updateRocket();
+        updatePlanets();
+        checkCollision();
+
+        score++;
+        scoreDisplay.textContent = "Puntuación: " + score;
+
+        // Subir de nivel cada 1000 puntos
+        if (score % 1000 === 0 && score > 0) {
+          level++;
+          levelDisplay.textContent = "Nivel: " + level;
+          createPlanets();
+        }
+
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function moveRocket(e) {
+      switch (e.key) {
+        case "ArrowUp":
+          rocket.dy = -rocket.speed;
+          break;
+        case "ArrowDown":
+          rocket.dy = rocket.speed;
+          break;
+        case "ArrowLeft":
+          rocket.dx = -rocket.speed;
+          break;
+        case "ArrowRight":
+          rocket.dx = rocket.speed;
+          break;
+      }
+    }
+
+    function stopRocket(e) {
+      switch (e.key) {
+        case "ArrowUp":
+        case "ArrowDown":
+          rocket.dy = 0;
+          break;
+        case "ArrowLeft":
+        case "ArrowRight":
+          rocket.dx = 0;
+          break;
+      }
+    }
+
+    function startGame() {
+      menu.classList.remove("show");
+      gameOverDiv.classList.remove("show");
+
+      menu.style.display = "none";
+      gameOverDiv.style.display = "none";
+      gameInfo.style.display = "block";
+
+      resetGame();
+      gameRunning = true;
+
+      // Iniciamos el bucle del juego
+      gameLoop();
+    }
+
+    function endGame() {
+      gameRunning = false;
+      finalScore.innerText = "Puntuación Final: " + score;
+      gameOverDiv.style.display = "block";
+      setTimeout(() => {
+        gameOverDiv.classList.add("show");
+      }, 50);
+    }
+
+    function resetGame() {
+      rocket.x = canvas.width / 2;
+      rocket.y = canvas.height / 2;
+      rocket.lives = 3;
+      rocket.dx = 0;
+      rocket.dy = 0;
+      rocket.invulnerable = false;
+
+      score = 0;
+      level = 1;
+
+      scoreDisplay.textContent = "Puntuación: " + score;
+      levelDisplay.textContent = "Nivel: " + level;
+      livesDisplay.textContent = "Vidas: " + rocket.lives;
+
+      createPlanets();
+      createPowerUps();
+
+      gameOverDiv.classList.remove("show");
+      gameInfo.style.display = "block";
+    }
+
+    // Mostrar el menú al inicio
+    menu.style.display = "block";
+    setTimeout(() => {
+      menu.classList.add("show");
+    }, 50);
+
+    // Listeners para el control del cohete
+    document.addEventListener("keydown", moveRocket);
+    document.addEventListener("keyup", stopRocket);
+  </script>
+</body>
+</html>

@@ -112,12 +112,10 @@
     const ctx = canvas.getContext("2d");
 
     // Imágenes locales (EN LA MISMA CARPETA):
-    // - rocketicon.png
+    // - rocketicon.png (cohete)
     // - tierra.png
     // - jupiter.png
-
-    // Simplemente quitamos crossOrigin y usamos rutas relativas.
-    // Asegúrate de que estos nombres coincidan EXACTAMENTE con los archivos en la misma carpeta.
+    // - rocket.png (power-up)
 
     // Cohete
     const rocketImg = new Image();
@@ -129,7 +127,7 @@
       "./jupiter.png"
     ];
 
-    // PowerUp (otra imagen local)
+    // PowerUp
     const powerUpImg = new Image();
     powerUpImg.src = "./rocket.png";
 
@@ -169,26 +167,68 @@
       invulnerable: false,
     };
 
-    // Genera planetas al azar con imágenes aleatorias
+    // Función para dibujar una imagen de forma redonda
+    // (enmascara la imagen en un círculo)
+    function drawCircleImage(img, x, y, size) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, x, y, size, size);
+      ctx.restore();
+    }
+
+    // Genera planetas al azar con imágenes aleatorias,
+    // asegurando que no aparezcan cerca del cohete.
     function createPlanets() {
       planets = [];
+      const safeRadius = 150; // Distancia de seguridad al rededor del cohete
+
       for (let i = 0; i < planetCount + level; i++) {
-        // Elige una imagen de forma aleatoria
-        const randomImg = planetImages[
-          Math.floor(Math.random() * planetImages.length)
-        ];
-        planets.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          size: 60 + Math.random() * 30,
-          dx: (Math.random() - 0.5) * 2,
-          dy: (Math.random() - 0.5) * 2,
-          img: randomImg,
-        });
+        let x, y, dist;
+        let attempts = 0;
+        do {
+          // Elige una imagen de forma aleatoria
+          const randomImg = planetImages[
+            Math.floor(Math.random() * planetImages.length)
+          ];
+
+          x = Math.random() * canvas.width;
+          y = Math.random() * canvas.height;
+
+          const dx = x - rocket.x;
+          const dy = y - rocket.y;
+          dist = Math.sqrt(dx * dx + dy * dy);
+
+          // Solo creamos el planeta si está lo suficientemente lejos
+          // En la primera comprobación, definimos size al azar.
+          var planetSize = 60 + Math.random() * 30;
+
+          // Si no está lejos, repetimos. Si tras muchos intentos no encontramos
+          // posición, lo dejamos para evitar bucles infinitos.
+          attempts++;
+          if (attempts > 100) {
+            // Si pasa de 100 intentos, colocamos el planeta sin la restricción
+            break;
+          }
+
+          if (dist >= safeRadius + planetSize / 2) {
+            planets.push({
+              x: x,
+              y: y,
+              size: planetSize,
+              dx: (Math.random() - 0.5) * 2,
+              dy: (Math.random() - 0.5) * 2,
+              img: randomImg,
+            });
+            break;
+          }
+        } while (true);
       }
     }
 
-    // Genera los powerUps (estrellas) al azar
+    // Genera los powerUps al azar
     function createPowerUps() {
       powerUps = [];
       for (let i = 0; i < 3; i++) {
@@ -202,19 +242,19 @@
     }
 
     function drawRocket() {
-      ctx.drawImage(rocketImg, rocket.x, rocket.y, rocket.size, rocket.size);
+      drawCircleImage(rocketImg, rocket.x, rocket.y, rocket.size);
     }
 
     function drawPlanets() {
       planets.forEach((planet) => {
-        ctx.drawImage(planet.img, planet.x, planet.y, planet.size, planet.size);
+        drawCircleImage(planet.img, planet.x, planet.y, planet.size);
       });
     }
 
     function drawPowerUps() {
       powerUps.forEach((powerUp) => {
         if (!powerUp.collected) {
-          ctx.drawImage(powerUpImg, powerUp.x, powerUp.y, powerUp.size, powerUp.size);
+          drawCircleImage(powerUpImg, powerUp.x, powerUp.y, powerUp.size);
         }
       });
     }
@@ -261,7 +301,6 @@
           if (rocket.lives <= 0) {
             endGame();
           } else {
-            // Reiniciamos la posición del cohete
             rocket.x = canvas.width / 2;
             rocket.y = canvas.height / 2;
             createPlanets();

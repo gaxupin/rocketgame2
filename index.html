@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Juego de Cohete Espacial con Imágenes Públicas</title>
+  <title>Juego de Cohete Espacial en Local</title>
   <style>
     /* Estilos generales */
     body {
@@ -111,34 +111,34 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    // Usaremos imágenes públicas de un repositorio de GitHub, con crossOrigin = "anonymous"
-    // para evitar errores de CORS.
+    // Imágenes locales (EN LA MISMA CARPETA):
+    // - rocketicon.png
+    // - tierra.png
+    // - jupiter.png
+
+    // Simplemente quitamos crossOrigin y usamos rutas relativas.
+    // Asegúrate de que estos nombres coincidan EXACTAMENTE con los archivos en la misma carpeta.
 
     // Cohete
     const rocketImg = new Image();
-    rocketImg.crossOrigin = "anonymous";
-    rocketImg.src =
-      "spaceship.png";
+    rocketImg.src = "./rocketicon.png";
 
-    // Planetas (usaremos una lista para un poco de variedad)
+    // Planetas (una lista con rutas relativas)
     const planetSources = [
-      "tierra.png",
-      "jupiter.png"
+      "./tierra.png",
+      "./jupiter.png"
     ];
 
-    // Creamos array de imágenes
+    // PowerUp (otra imagen local)
+    const powerUpImg = new Image();
+    powerUpImg.src = "./rocket.png";
+
+    // Array para imágenes de planetas
     const planetImages = planetSources.map((url) => {
       const img = new Image();
-      img.crossOrigin = "anonymous";
       img.src = url;
       return img;
     });
-
-    // PowerUp (estrella)
-    const powerUpImg = new Image();
-    powerUpImg.crossOrigin = "anonymous";
-    powerUpImg.src =
-      "rocketicon.png";
 
     // Referencias a elementos HTML
     const menu = document.getElementById("menu");
